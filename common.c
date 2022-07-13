@@ -1,16 +1,20 @@
 #include"./common.h"
 
-socket_t create_server_socket(int port) {
+server_socket_info_t* create_server_socket(int port) {
   socket_t sockfd;
-  sockaddr_in_t addr_in;
+  sockaddr_in_t *addr_in;
   socklen_t addr_len;
   sockaddr_t* addr;
+  server_socket_info_t* sock_info;
   int domain, option = 1;
 
+  sock_info = (server_socket_info_t*) malloc(sizeof(server_socket_info_t));
+  addr_in = (sockaddr_in_t*) malloc(sizeof(sockaddr_in_t));
+
   domain = AF_INET;
-  addr_in.sin_family = domain;
-  addr_in.sin_addr.s_addr = INADDR_ANY;
-  addr_in.sin_port = htons(port);
+  addr_in->sin_family = domain;
+  addr_in->sin_addr.s_addr = INADDR_ANY;
+  addr_in->sin_port = htons(port);
   addr_len = sizeof(addr_in);
 
   if ((sockfd = socket(domain, SOCK_STREAM, 0)) == 0) {
@@ -30,7 +34,12 @@ socket_t create_server_socket(int port) {
     exit(3);
   }
 
-  return sockfd;
+  sock_info->port = port;
+  sock_info->addr = addr;
+  sock_info->addr_len = addr_len;
+  sock_info->fd = sockfd;
+
+  return sock_info;
 }
 
 socket_t create_equipement_socket(char const* host, int port) {
@@ -56,6 +65,11 @@ socket_t create_equipement_socket(char const* host, int port) {
     close(serverfd);
     printf("Connection Failed\n");
     return -1;
+  }
+
+  if (listen(sockfd, 3) != 0) {
+    perror("listen");
+    exit(4);
   }
 
   return sockfd;
