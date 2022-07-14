@@ -4,6 +4,7 @@
 #include"./common.h"
 
 #define MAX_CLIENTS 15
+#define MAX_CLIENTS_REACHED_PAYLOAD "04"
 
 typedef struct worker_args {
   int index;
@@ -25,29 +26,7 @@ int get_available_thread_index() {
   return -1;
 }
 
-void* create_worker_args(int index, socket_t client_fd) {
-  worker_args_t* args = (worker_args_t*) malloc(sizeof(worker_args_t));
-  args->index = index;
-  args->client_fd = client_fd;
-  return (void*)args;
-}
-
-void broadcast(char* message) {
-  int i;
-  for (i = 0; i < MAX_CLIENTS; i++) {
-    if (connections[i] != NULL) {
-      send(connections[i]->client_fd, message, BUFF_SIZE, 0);
-    }
-  }
-}
-
-void disconnect_client(socket_t client_fd) {
-  char* dc_message = (char*)calloc(BUFF_SIZE, sizeof(char));
-  send(client_fd, dc_message, BUFF_SIZE, 0);
-  close(client_fd);
-}
-
-int get_index(){
+int get_index() {
   if (clients >= MAX_CLIENTS) {
     return -1;
   }
@@ -56,12 +35,11 @@ int get_index(){
   return index;
 }
 
-void send_max_clients_reached(socket_t client_fd){
-  message_t* res = init_message();
-  res->id = ERROR;
-  res->destination = 0;
-  set_payload(res, "04", 2);
-  send(client_fd, res, BUFF_SIZE, 0);
+void* create_worker_args(int index, socket_t client_fd) {
+  worker_args_t* args = (worker_args_t*) malloc(sizeof(worker_args_t));
+  args->index = index;
+  args->client_fd = client_fd;
+  return (void*)args;
 }
 
 void* worker(void* arg) {
@@ -73,6 +51,15 @@ void* worker(void* arg) {
     printf("< %s", buff);
   }
   return NULL;
+}
+
+void broadcast(char* message) {
+  int i;
+  for (i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL) {
+      send(connections[i]->client_fd, message, BUFF_SIZE, 0);
+    }
+  }
 }
 
 void create_client(socket_t client_fd, int index) {
@@ -93,6 +80,24 @@ void create_client(socket_t client_fd, int index) {
   pthread_create(&threads[index], NULL, worker, worker_args);
 
   destroy_message(res_args);
+}
+
+void disconnect_client(socket_t client_fd) {
+  char* dc_message = (char*)calloc(BUFF_SIZE, sizeof(char));
+  send(client_fd, dc_message, BUFF_SIZE, 0);
+  close(client_fd);
+}
+
+void send_max_clients_reached(socket_t client_fd){
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+
+  res_args->id = ERROR;
+  res_args->destination = 0;
+  set_payload(res_args, MAX_CLIENTS_REACHED_PAYLOAD, sizeof(MAX_CLIENTS_REACHED_PAYLOAD));
+
+  encode_args(res, res_args);
+  send(client_fd, res, BUFF_SIZE, 0);
 }
 
 void handshake(socket_t client_fd) {

@@ -2,6 +2,26 @@
 
 #include "./common.h"
 
+void print_error(int code){
+  switch (code){
+    case 1:
+      printf("Equipment not found\n");
+      break;
+    case 2:
+      printf("Source equipment not found\n");
+      break;
+    case 3:
+      printf("Target equipment not found\n");
+      break;
+    case 4:
+      printf("Equipment limit exceeded\n");
+      break;
+    default:
+      printf("Unknown error\n");
+      break;
+  }
+}
+
 int handshake(client_socket_info_t* sock_info){
   char req[BUFF_SIZE];
   char res[BUFF_SIZE];
@@ -16,6 +36,9 @@ int handshake(client_socket_info_t* sock_info){
     decode_args(res, res_args);
     if(res_args->id == RES_ADD && res_args->payload_size == 2){
       id = atoi(res_args->payload);
+    }
+    else if (res_args->id == ERROR){
+      print_error(atoi(res_args->payload));
     }
   }
 
@@ -84,8 +107,7 @@ int main(int argc, char const *argv[])
 
   sock_info = create_equipement_socket(host, port);
   int id = handshake(sock_info);
-  if(id < 0){
-    printf("Error\n");
+  if(id <= 0){
     return -1;
   }
 
