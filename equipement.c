@@ -24,13 +24,41 @@ int handshake(client_socket_info_t* sock_info){
   return id;
 }
 
+void handle_message(message_t* message){
+  switch (message->id)
+  {
+    case RES_ADD:
+      printf("Novo equipamento adicionado: %s\n", (char*)message->payload);
+      break;
+    case RES_LIST:
+      printf("RES_LIST\n");
+      break;
+    case RES_INF:
+      printf("RES_INF\n");
+      break;
+    case ERROR:
+      printf("ERROR\n");
+      break;
+    case OK:
+      printf("OK\n");
+      break;
+    default:
+      printf("UNKNOWN\n");
+      break;
+  }
+}
+
 void* receiver(void* args) {
   char req[BUFF_SIZE];
+  message_t* res_args = init_message();
   client_socket_info_t* sock_info = (client_socket_info_t*)args;
 
   while (read(sock_info->server_fd, req, BUFF_SIZE) != 0b00000000) {
-    printf("< %s", req);
+    decode_args(req, res_args);
+    handle_message(res_args);
   }
+
+  destroy_message(res_args);
 }
 
 void* sender(void* args){
