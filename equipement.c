@@ -1,3 +1,5 @@
+#include<pthread.h>
+
 #include "./common.h"
 
 int handshake(client_socket_info_t* sock_info){
@@ -22,12 +24,35 @@ int handshake(client_socket_info_t* sock_info){
   return id;
 }
 
+void* receiver(void* args) {
+  char req[BUFF_SIZE];
+  client_socket_info_t* sock_info = (client_socket_info_t*)args;
+
+  while (read(sock_info->server_fd, req, BUFF_SIZE) != 0b00000000) {
+    printf("< %s", req);
+  }
+}
+
+void* sender(void* args){
+  char req[BUFF_SIZE];
+  client_socket_info_t* sock_info = (client_socket_info_t*)args;
+
+  while (!feof(stdin)) {
+    int size = read_input(req, BUFF_SIZE);
+
+    if (size > 1) {
+      send(sock_info->server_fd, req, BUFF_SIZE, 0);
+    }
+  }
+}
+
 int main(int argc, char const *argv[])
 {
   char const* host = argv[1];
   char req[BUFF_SIZE], res[BUFF_SIZE];
   int port = atoi(argv[2]);
   client_socket_info_t* sock_info;
+  pthread_t receiver_thread, sender_thread;
 
   sock_info = create_equipement_socket(host, port);
   int id = handshake(sock_info);
@@ -36,13 +61,10 @@ int main(int argc, char const *argv[])
     return -1;
   }
 
-  while (!feof(stdin) && strncmp(req, "kill", 5)) {
-    int size = read_input(req, BUFF_SIZE);
+  pthread_create(&receiver_thread, NULL, receiver, (void*)sock_info);
+  pthread_create(&sender_thread, NULL, sender, (void*)sock_info);
 
-    if (size > 1) {
-      send(sock_info->server_fd, req, BUFF_SIZE, 0);
-    }
-  }
+  pthread_join(sender_thread, NULL);
   
   return 0;
 }
