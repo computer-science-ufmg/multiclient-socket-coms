@@ -3,17 +3,17 @@
 
 #include"./common.h"
 
-#define MAX_CLIENTS 1
-
-pthread_t threads[MAX_CLIENTS];
-equipement_t equipements[MAX_CLIENTS];
-int clients = 0;
-pthread_mutex_t mutex;
+#define MAX_CLIENTS 15
 
 typedef struct worker_args {
   int index;
   socket_t client_fd;
 } worker_args_t;
+
+pthread_t threads[MAX_CLIENTS];
+worker_args_t* connections[MAX_CLIENTS];
+int clients = 0;
+pthread_mutex_t mutex;
 
 int get_available_thread_index() {
   int i;
@@ -30,6 +30,15 @@ void* create_worker_args(int index, socket_t client_fd) {
   args->index = index;
   args->client_fd = client_fd;
   return (void*)args;
+}
+
+void broadcast(char* message) {
+  int i;
+  for (i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL) {
+      send(connections[i]->client_fd, message, BUFF_SIZE, 0);
+    }
+  }
 }
 
 void disconnect_client(socket_t client_fd) {
@@ -58,7 +67,7 @@ void send_max_clients_reached(socket_t client_fd){
 void* worker(void* arg) {
   char buff[BUFF_SIZE];
   worker_args_t* args = (worker_args_t*)arg;
-  printf("Connected client %d\n", args->client_fd);
+  printf("Equipment %02d added\n", args->client_fd);
 
   while (read(args->client_fd, buff, BUFF_SIZE) != 0b00000000) {
     printf("< %s", buff);
@@ -69,16 +78,19 @@ void* worker(void* arg) {
 void create_client(socket_t client_fd, int index) {
   char res[BUFF_SIZE];
   message_t* res_args = init_message();
+  worker_args_t* worker_args = create_worker_args(index, client_fd);
+
+  clients++;
+  connections[index] = worker_args;
 
   res_args->id = RES_ADD;
   char payload[3];
   sprintf(payload, "%02d", client_fd);
   set_payload(res_args, payload, sizeof(payload));
   encode_args(res, res_args);
-  send(client_fd, res, BUFF_SIZE, 0);
+  broadcast(res);
 
-  clients++;
-  pthread_create(&threads[index], NULL, worker, create_worker_args(index, client_fd));
+  pthread_create(&threads[index], NULL, worker, worker_args);
 
   destroy_message(res_args);
 }
