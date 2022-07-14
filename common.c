@@ -5,12 +5,37 @@
 char* slice(char* str, int start, int end) {
   int i, size = end - start;
   char* res = (char*)malloc(sizeof(char) * size);
-  strncmp(res, str + start, size);
+  strncpy(res, str + start, size);
   res[size] = '\0';
   return res;
 }
 
-int read_message(char* buff, int size) {
+message_t* init_message() {
+  message_t* message = (message_t*)malloc(sizeof(message_t));
+  message->id = 0;
+  message->origin = 0;
+  message->destination = 0;
+  message->payload = NULL;
+  message->payload_size = 0;
+  return message;
+}
+
+void set_payload(message_t* message, void* payload, size_t payload_size) {
+  message->payload = malloc(payload_size);
+  message->payload_size = payload_size;
+  memcpy(message->payload, payload, payload_size);
+}
+
+void destroy_message(message_t* message) {
+  if(message != NULL){
+    free(message);
+    if (message->payload != NULL) {
+      free(message->payload);
+    }
+  }
+}
+
+int read_input(char* buff, int size) {
   char c;
   int pos = 0;
   printf("> ");
@@ -36,38 +61,46 @@ void str_to_command(char* command) {
   *char_pos = '\n';
 }
 
-message_t* decode_args(char* command) {
-  message_t* args = (message_t*) malloc(sizeof(message_t));
+void decode_args(char* command, message_t* args) {
   command_to_str(command);
 
   char* id = slice(command, 0, 2);
-  char* origin = slice(command, 3, 5);
-  char* destination = slice(command, 6, 8);
-  int payload_size = strlen(command) - 9;
-  char* payload = slice(command, 9, strlen(command));
+  // printf("req.id: %s\n", id);
+  char* origin = slice(command, 2, 4);
+  // printf("req.origin: %s\n", origin);
+  char* destination = slice(command, 4, 6);
+  // printf("req.destination: %s\n", destination);
+  int payload_size = strlen(command) - 6;
+  // printf("payload_size: %d\n", payload_size);
+  char* payload = NULL;
+  if(payload_size > 0) {
+    payload = slice(command, 6, strlen(command));
+    // printf("req.payload: %s\n", payload);
+  }
 
   args->id = atoi(id);
   args->origin = atoi(origin);
   args->destination = atoi(destination);
-  args->payload = payload;
-  args->payload_size = (void*)payload_size;
+  args->payload = (void*)payload;
+  args->payload_size = payload_size;
 
   free(id);
   free(origin);
   free(destination);
-
-  return args;
 }
 
-char* encode_args(message_t* args) {
-  char* command;
-  char* payload = (char*)malloc(sizeof(char) * args->payload_size);
-  memcpy(payload, args->payload, args->payload_size);
-
-  sprintf(command, "%02d%02d%02d%s", args->id, args->origin, args->destination, args->payload);
-
-  free(payload);
-  return command;
+void encode_args(char* command, message_t* args) {
+  if(args->payload != NULL && args->payload_size > 0){
+    char* payload = (char*)malloc(args->payload_size + 1);
+    memcpy(payload, args->payload, args->payload_size);
+    payload[args->payload_size] = '\0';
+    sprintf(command, "%02d%02d%02d%s", args->id, args->origin, args->destination, (char*)args->payload);
+    free(payload);
+  }
+  else{
+    sprintf(command, "%02d%02d%02d", args->id, args->origin, args->destination);
+  }
+  str_to_command(command);
 }
 
 sockaddr_in_t* get_local_addr_in(int port){
