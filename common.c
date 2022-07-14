@@ -166,7 +166,7 @@ socket_t connect_client(server_socket_info_t* sock_info) {
   return client_fd;
 }
 
-client_socket_info_t* create_equipement_socket(char const* host, int port) {
+client_socket_info_t* create_equipment_socket(char const* host, int port) {
   socket_t sockfd, serverfd;
   sockaddr_in_t serv_addr_in;
   socklen_t addr_len;

@@ -27,7 +27,7 @@
 
 // ========================== types ========================== //
 
-typedef int equipement_t;
+typedef int equipment_t;
 
 typedef struct sockaddr_in sockaddr_in_t;
 typedef struct sockaddr sockaddr_t;
@@ -63,4 +63,4 @@ void encode_args(char* command, message_t* args);
 
 server_socket_info_t* create_server_socket(int port);
 socket_t connect_client(server_socket_info_t* sock_info);
-client_socket_info_t* create_equipement_socket(char const* host, int port);
+client_socket_info_t* create_equipment_socket(char const* host, int port);

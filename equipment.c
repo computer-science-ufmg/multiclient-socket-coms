@@ -105,7 +105,7 @@ int main(int argc, char const *argv[])
   client_socket_info_t* sock_info;
   pthread_t receiver_thread, sender_thread;
 
-  sock_info = create_equipement_socket(host, port);
+  sock_info = create_equipment_socket(host, port);
   int id = handshake(sock_info);
   if(id <= 0){
     return -1;
