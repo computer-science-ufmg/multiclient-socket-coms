@@ -7,12 +7,12 @@ int handshake(client_socket_info_t* sock_info){
   message_t* req_args = init_message();
   message_t* res_args = init_message();
 
-  req_args->id = 1;
+  req_args->id = REQ_ADD;
   encode_args(req, req_args);
   send(sock_info->server_fd, req, BUFF_SIZE, 0);
   if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000){
     decode_args(res, res_args);
-    if(res_args->payload_size == 2){
+    if(res_args->id == RES_ADD && res_args->payload_size == 2){
       id = atoi(res_args->payload);
     }
   }

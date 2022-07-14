@@ -12,9 +12,9 @@ char* slice(char* str, int start, int end) {
 
 message_t* init_message() {
   message_t* message = (message_t*)malloc(sizeof(message_t));
-  message->id = 0;
-  message->origin = 0;
-  message->destination = 0;
+  message->id = -1;
+  message->origin = -1;
+  message->destination = -1;
   message->payload = NULL;
   message->payload_size = 0;
   return message;
