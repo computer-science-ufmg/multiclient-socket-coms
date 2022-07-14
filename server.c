@@ -43,6 +43,7 @@ void* worker(void* arg) {
 int main(int argc, char const *argv[])
 {
   int port = atoi(argv[1]), clients = 0;
+  printf("Server listening on port %d\n", port);
   
   while(TRUE){
     server_socket_info_t* sock_info = create_server_socket(port);

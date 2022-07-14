@@ -1,33 +1,37 @@
 #include"./common.h"
 
+sockaddr_in_t* get_local_addr_in(int port){
+  sockaddr_in_t* addr_in = (sockaddr_in_t*)malloc(sizeof(sockaddr_in_t));
+
+  addr_in->sin_family = AF_INET;
+  addr_in->sin_addr.s_addr = INADDR_ANY;
+  addr_in->sin_port = htons(port);
+  return addr_in;
+}
+
 server_socket_info_t* create_server_socket(int port) {
   socket_t sockfd;
   sockaddr_in_t *addr_in;
   socklen_t addr_len;
   sockaddr_t* addr;
   server_socket_info_t* sock_info;
-  int domain, option = 1;
+  int option = 1;
 
   sock_info = (server_socket_info_t*) malloc(sizeof(server_socket_info_t));
-  addr_in = (sockaddr_in_t*) malloc(sizeof(sockaddr_in_t));
+  addr_in = get_local_addr_in(port);
+  addr_len = sizeof(sockaddr_in_t);
 
-  domain = AF_INET;
-  addr_in->sin_family = domain;
-  addr_in->sin_addr.s_addr = INADDR_ANY;
-  addr_in->sin_port = htons(port);
-  addr_len = sizeof(addr_in);
-
-  if ((sockfd = socket(domain, SOCK_STREAM, 0)) == 0) {
+  if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     perror("socket");
     exit(1);
   }
 
-  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &option, sizeof(option))) {
+  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &option, sizeof(option)) < 0) {
     perror("setsockopt");
     exit(2);
   }
 
-  addr = (sockaddr_t*)&addr_in;
+  addr = (sockaddr_t*)addr_in;
 
   if (bind(sockfd, addr, addr_len) < 0) {
     perror("bind");
