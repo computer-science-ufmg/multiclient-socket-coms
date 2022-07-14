@@ -38,12 +38,30 @@ server_socket_info_t* create_server_socket(int port) {
     exit(3);
   }
 
+  if (listen(sockfd, 3) < 0) {
+    perror("listen");
+    exit(4);
+  }
+
   sock_info->port = port;
   sock_info->addr = addr;
   sock_info->addr_len = addr_len;
   sock_info->fd = sockfd;
 
   return sock_info;
+}
+
+socket_t connect_client(server_socket_info_t* sock_info) {
+  socket_t client_fd;
+  socket_t server_sock = sock_info->fd;
+  sockaddr_t* addr = sock_info->addr;
+  socklen_t addr_len = sizeof(*addr);
+  
+  if ((client_fd = accept(server_sock, addr, &addr_len)) < 0) {
+    perror("accept");
+    exit(5);
+  }
+  return client_fd;
 }
 
 socket_t create_equipement_socket(char const* host, int port) {
@@ -71,7 +89,7 @@ socket_t create_equipement_socket(char const* host, int port) {
     return -1;
   }
 
-  if (listen(sockfd, 3) != 0) {
+  if (listen(sockfd, 3) < 0) {
     perror("listen");
     exit(4);
   }

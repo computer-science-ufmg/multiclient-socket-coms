@@ -44,15 +44,10 @@ int main(int argc, char const *argv[])
 {
   int port = atoi(argv[1]), clients = 0;
   printf("Server listening on port %d\n", port);
+  server_socket_info_t* sock_info = create_server_socket(port);
   
   while(TRUE){
-    server_socket_info_t* sock_info = create_server_socket(port);
-    socket_t client_fd;
-
-    if ((client_fd = accept(sock_info->fd, sock_info->addr, &(sock_info->addr_len))) < 0) {
-      perror("accept");
-      exit(5);
-    }
+    socket_t client_fd = connect_client(sock_info);
 
     clients++;
     int index = get_available_thread_index();
@@ -63,6 +58,8 @@ int main(int argc, char const *argv[])
 
     pthread_create(&threads[index], NULL, worker, create_worker_args(index, client_fd));
   }
+
+  close(sock_info->fd);
 
   return 0;
 }

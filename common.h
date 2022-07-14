@@ -26,4 +26,5 @@ typedef struct server_socket_info {
 } server_socket_info_t;
 
 server_socket_info_t* create_server_socket(int port);
+socket_t connect_client(server_socket_info_t* sock_info);
 socket_t create_equipement_socket(char const* host, int port);
