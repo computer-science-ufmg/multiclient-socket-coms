@@ -25,6 +25,16 @@ typedef struct server_socket_info {
   socket_t fd;
 } server_socket_info_t;
 
+typedef struct client_socket_info {
+  socket_t fd;
+  socket_t server_fd;
+} client_socket_info_t;
+
+
+int read_message(char* buff, int size);
+void terminate_command_string(char* command);
+void format_command_string(char* command);
+
 server_socket_info_t* create_server_socket(int port);
 socket_t connect_client(server_socket_info_t* sock_info);
-socket_t create_equipement_socket(char const* host, int port);
+client_socket_info_t* create_equipement_socket(char const* host, int port);

@@ -34,8 +34,9 @@ void* worker(void* arg) {
   char buff[BUFF_SIZE];
   worker_args_t* args = (worker_args_t*)arg;
   printf("Connected client %d\n", args->client_fd);
-  while (recv(args->client_fd, buff, BUFF_SIZE, 0) != 0b00000000) {
-    // 
+  while (read(args->client_fd, buff, BUFF_SIZE) != 0b00000000) {
+    terminate_command_string(buff);
+    printf("< %s\n", buff);
   }
   return NULL;
 }

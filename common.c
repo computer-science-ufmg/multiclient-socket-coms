@@ -1,5 +1,31 @@
 #include"./common.h"
 
+int read_message(char* buff, int size) {
+  char c;
+  int pos = 0;
+  printf("> ");
+  while (pos < (size - 1) && !feof(stdin) && (c = getchar())) {
+    if (c == '\n' || c == '\0') {
+      break;
+    }
+    buff[pos] = c;
+    pos++;
+  }
+  buff[pos] = '\n';
+  pos++;
+  return pos;
+}
+
+void terminate_command_string(char* command) {
+  char* char_pos = strchr(command, '\n');
+  *char_pos = '\0';
+}
+
+void format_command_string(char* command) {
+  char* char_pos = strchr(command, '\0');
+  *char_pos = '\n';
+}
+
 sockaddr_in_t* get_local_addr_in(int port){
   sockaddr_in_t* addr_in = (sockaddr_in_t*)malloc(sizeof(sockaddr_in_t));
 
@@ -64,11 +90,12 @@ socket_t connect_client(server_socket_info_t* sock_info) {
   return client_fd;
 }
 
-socket_t create_equipement_socket(char const* host, int port) {
+client_socket_info_t* create_equipement_socket(char const* host, int port) {
   socket_t sockfd, serverfd;
   sockaddr_in_t serv_addr_in;
   socklen_t addr_len;
   sockaddr_t* serv_addr;
+  client_socket_info_t* sock_info = (client_socket_info_t*) malloc(sizeof(client_socket_info_t));
   int domain, option = 1;
 
   domain = AF_INET;
@@ -80,19 +107,16 @@ socket_t create_equipement_socket(char const* host, int port) {
 
   if ((serverfd = socket(domain, SOCK_STREAM, 0)) == 0) {
     perror("socket");
-    return 1;
+    exit(1);
   }
 
   if ((sockfd = connect(serverfd, serv_addr, addr_len)) < 0) {
     close(serverfd);
     printf("Connection Failed\n");
-    return -1;
+    exit(2);
   }
 
-  if (listen(sockfd, 3) < 0) {
-    perror("listen");
-    exit(4);
-  }
-
-  return sockfd;
+  sock_info->fd = sockfd;
+  sock_info->server_fd = serverfd;
+  return sock_info;
 }
