@@ -1,4 +1,14 @@
+#include<string.h>
+
 #include"./common.h"
+
+char* slice(char* str, int start, int end) {
+  int i, size = end - start;
+  char* res = (char*)malloc(sizeof(char) * size);
+  strncmp(res, str + start, size);
+  res[size] = '\0';
+  return res;
+}
 
 int read_message(char* buff, int size) {
   char c;
@@ -16,14 +26,48 @@ int read_message(char* buff, int size) {
   return pos;
 }
 
-void terminate_command_string(char* command) {
+void command_to_str(char* command) {
   char* char_pos = strchr(command, '\n');
   *char_pos = '\0';
 }
 
-void format_command_string(char* command) {
+void str_to_command(char* command) {
   char* char_pos = strchr(command, '\0');
   *char_pos = '\n';
+}
+
+message_t* decode_args(char* command) {
+  message_t* args = (message_t*) malloc(sizeof(message_t));
+  command_to_str(command);
+
+  char* id = slice(command, 0, 2);
+  char* origin = slice(command, 3, 5);
+  char* destination = slice(command, 6, 8);
+  int payload_size = strlen(command) - 9;
+  char* payload = slice(command, 9, strlen(command));
+
+  args->id = atoi(id);
+  args->origin = atoi(origin);
+  args->destination = atoi(destination);
+  args->payload = payload;
+  args->payload_size = (void*)payload_size;
+
+  free(id);
+  free(origin);
+  free(destination);
+
+  return args;
+}
+
+char* encode_args(message_t* args) {
+  char* command;
+  char* payload = (char*)malloc(sizeof(char) * args->payload_size);
+  memcpy(payload, args->payload, args->payload_size);
+
+  sprintf(command, "%02d%02d%02d%s", args->id, args->origin, args->destination, args->payload);
+
+  free(payload);
+  return command;
 }
 
 sockaddr_in_t* get_local_addr_in(int port){
@@ -111,8 +155,8 @@ client_socket_info_t* create_equipement_socket(char const* host, int port) {
   }
 
   if ((sockfd = connect(serverfd, serv_addr, addr_len)) < 0) {
+    perror("connect");
     close(serverfd);
-    printf("Connection Failed\n");
     exit(2);
   }
 

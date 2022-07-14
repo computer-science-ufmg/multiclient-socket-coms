@@ -18,6 +18,14 @@ typedef struct sockaddr_in sockaddr_in_t;
 typedef struct sockaddr sockaddr_t;
 typedef int socket_t;
 
+typedef struct message_t {
+  int id;
+  int origin;
+  int destination;
+  size_t payload_size;
+  void* payload;
+} message_t;
+
 typedef struct server_socket_info {
   int port;
   sockaddr_t* addr;
@@ -32,8 +40,8 @@ typedef struct client_socket_info {
 
 
 int read_message(char* buff, int size);
-void terminate_command_string(char* command);
-void format_command_string(char* command);
+message_t* decode_args(char* command);
+char* encode_args(message_t* args);
 
 server_socket_info_t* create_server_socket(int port);
 socket_t connect_client(server_socket_info_t* sock_info);
