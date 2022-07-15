@@ -111,6 +111,8 @@ int main(int argc, char const *argv[])
     return -1;
   }
 
+  printf("New ID: %d\n", id);
+
   pthread_create(&receiver_thread, NULL, receiver, (void*)sock_info);
   pthread_create(&sender_thread, NULL, sender, (void*)sock_info);
 

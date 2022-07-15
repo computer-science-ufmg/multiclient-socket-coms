@@ -35,8 +35,52 @@ int get_index() {
   return index;
 }
 
+void broadcast(char* message) {
+  int i;
+  for (i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL) {
+      send(connections[i]->client_fd, message, BUFF_SIZE, 0);
+    }
+  }
+}
+
+void disconnect_client(socket_t client_fd) {
+  char* dc_message = (char*)calloc(BUFF_SIZE, sizeof(char));
+  send(client_fd, dc_message, BUFF_SIZE, 0);
+  close(client_fd);
+}
+
+void send_max_clients_reached(socket_t client_fd){
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+
+  res_args->id = ERROR;
+  res_args->destination = 0;
+  set_payload(res_args, MAX_CLIENTS_REACHED_PAYLOAD, sizeof(MAX_CLIENTS_REACHED_PAYLOAD));
+
+  encode_args(res, res_args);
+  send(client_fd, res, BUFF_SIZE, 0);
+}
+
+void list_equipments(worker_args_t *args) {
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+
+  char payload[(MAX_CLIENTS * 2) + 1];
+  res_args->id = RES_LIST;
+  for(int i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL && connections[i]->client_fd != args->client_fd) {
+      sprintf(payload, "%s%02d", payload, connections[i]->client_fd);
+    }
+  }
+
+  set_payload(res_args, payload, strlen(payload));
+  encode_args(res, res_args);
+  send(args->client_fd, res, BUFF_SIZE, 0);
+}
+
 void* create_worker_args(int index, socket_t client_fd) {
-  worker_args_t* args = (worker_args_t*) malloc(sizeof(worker_args_t));
+  worker_args_t* args = (worker_args_t*)malloc(sizeof(worker_args_t));
   args->index = index;
   args->client_fd = client_fd;
   return (void*)args;
@@ -47,19 +91,11 @@ void* worker(void* arg) {
   worker_args_t* args = (worker_args_t*)arg;
   printf("Equipment %02d added\n", args->client_fd);
 
+  list_equipments(args);
   while (read(args->client_fd, buff, BUFF_SIZE) != 0b00000000) {
     printf("< %s", buff);
   }
   return NULL;
-}
-
-void broadcast(char* message) {
-  int i;
-  for (i = 0; i < MAX_CLIENTS; i++) {
-    if (connections[i] != NULL) {
-      send(connections[i]->client_fd, message, BUFF_SIZE, 0);
-    }
-  }
 }
 
 void create_client(socket_t client_fd, int index) {
@@ -82,24 +118,6 @@ void create_client(socket_t client_fd, int index) {
   destroy_message(res_args);
 }
 
-void disconnect_client(socket_t client_fd) {
-  char* dc_message = (char*)calloc(BUFF_SIZE, sizeof(char));
-  send(client_fd, dc_message, BUFF_SIZE, 0);
-  close(client_fd);
-}
-
-void send_max_clients_reached(socket_t client_fd){
-  char res[BUFF_SIZE];
-  message_t* res_args = init_message();
-
-  res_args->id = ERROR;
-  res_args->destination = 0;
-  set_payload(res_args, MAX_CLIENTS_REACHED_PAYLOAD, sizeof(MAX_CLIENTS_REACHED_PAYLOAD));
-
-  encode_args(res, res_args);
-  send(client_fd, res, BUFF_SIZE, 0);
-}
-
 void handshake(socket_t client_fd) {
   char req[BUFF_SIZE];
   int index;
@@ -110,7 +128,7 @@ void handshake(socket_t client_fd) {
     if (req_args->id != REQ_ADD) {
       disconnect_client(client_fd);
     }
-    else{
+    else {
       pthread_mutex_lock(&mutex);
       index = get_index();
       if (index == -1) {
@@ -118,13 +136,13 @@ void handshake(socket_t client_fd) {
         send_max_clients_reached(client_fd);
         close(client_fd);
       }
-      else{
+      else {
         create_client(client_fd, index);
       }
       pthread_mutex_unlock(&mutex);
     }
   }
-  
+
   destroy_message(req_args);
 }
 
