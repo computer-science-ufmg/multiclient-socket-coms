@@ -83,16 +83,101 @@ void* create_worker_args(int index, socket_t client_fd) {
   return (void*)args;
 }
 
-void* worker(void* arg) {
-  char buff[BUFF_SIZE];
-  worker_args_t* args = (worker_args_t*)arg;
-  printf("Equipment %02d added\n", args->client_fd);
+void broadcast_remove(int client){
+  char req[BUFF_SIZE];
+  message_t* req_args = init_message();
 
-  list_equipments(args);
-  while (read(args->client_fd, buff, BUFF_SIZE) != 0b00000000) {
-    printf("< %s", buff);
+  req_args->id = REQ_REM;
+  req_args->origin = client;
+
+  encode_args(req, req_args);
+  destroy_message(req_args);
+  broadcast(req);
+}
+
+void send_remove_error(socket_t client_fd) {
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+
+  res_args->id = ERROR;
+  res_args->destination = client_fd;
+  set_payload(res_args, REMOVE_ERROR_PAYLOAD, sizeof(REMOVE_ERROR_PAYLOAD));
+
+  encode_args(res, res_args);
+  destroy_message(res_args);
+  send(client_fd, res, BUFF_SIZE, 0);
+}
+
+void handle_remove(message_t* message) {
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+  int origin = message->origin, index = -1;
+
+  for(int i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL && connections[i]->client_fd == origin) {
+      index = i;
+      break;
+    }
   }
-  return NULL;
+
+  if(index == -1){
+    send_remove_error(message->origin);
+    return;
+  }
+
+  pthread_mutex_lock(&mutex);
+  worker_args_t* client = connections[index];
+  connections[index] = NULL;
+  threads[index] = 0;
+  clients--;
+  broadcast_remove(origin);
+  pthread_mutex_unlock(&mutex);
+
+  res_args->id = OK;
+  res_args->destination = origin;
+  set_payload(res_args, SUCCESSFULL_REMOVAL_PAYLOAD, sizeof(SUCCESSFULL_REMOVAL_PAYLOAD));
+  encode_args(res, res_args);
+
+  send(client->client_fd, res, BUFF_SIZE, 0);
+  destroy_message(res_args);
+  close(origin);
+  free(client);
+}
+
+void handle_request(message_t* request) {
+  switch (request->id) {
+    case REQ_INF:
+      /* code */
+      break;
+
+    case REQ_REM:
+      handle_remove(request);
+      break;
+    
+    default:
+      // 
+      break;
+  }
+}
+
+void* worker(void* arg) {
+  char req[BUFF_SIZE];
+  char res[BUFF_SIZE];
+  message_t* req_args = init_message();
+  message_t* res_args = init_message();
+  worker_args_t* client = (worker_args_t*)arg;
+  int client_fd = client->client_fd;
+  int index = client->index;
+  printf("Equipment %02d added\n", client_fd);
+
+  list_equipments(client);
+  while (connections[index] != NULL && read(client_fd, req, BUFF_SIZE) != 0b00000000) {
+    decode_args(req, req_args);
+    handle_request(req_args);
+  }
+
+  destroy_message(req_args);
+  destroy_message(res_args);
 }
 
 void create_client(socket_t client_fd, int index) {

@@ -13,8 +13,10 @@
 #define BUFF_SIZE 500
 #define MAX_CLIENTS 15
 
-// ====================== Error Payloads ====================== //
+// ========================= Payloads ========================= //
 
+#define SUCCESSFULL_REMOVAL_PAYLOAD "01"
+#define REMOVE_ERROR_PAYLOAD "01"
 #define MAX_CLIENTS_REACHED_PAYLOAD "04"
 
 // ========================= messages ========================= //

@@ -3,6 +3,7 @@
 
 #include "./common.h"
 
+int id;
 int equipments[MAX_CLIENTS];
 int equiments_size = 0;
 
@@ -30,6 +31,17 @@ void print_error(int code){
     default:
       printf("Unknown error\n");
       break;
+  }
+}
+
+void print_ok(int code) {
+  switch (code) {
+  case 1:
+    printf("Successful removal\n");
+    break;
+  default:
+    printf("Unknown message\n");
+    break;
   }
 }
 
@@ -79,7 +91,7 @@ void handle_res_list(message_t* message){
   }
 }
 
-void handle_message(message_t* message){
+int handle_message(message_t* message){
   switch (message->id)
   {
     case RES_ADD:
@@ -92,15 +104,59 @@ void handle_message(message_t* message){
       printf("RES_INF\n");
       break;
     case ERROR:
-      printf("ERROR\n");
+      if (message->payload_size == 2) {
+        int code = atoi(message->payload);
+        print_error(code);
+        if (code == 1) {
+          return -1;
+        }
+      }
       break;
     case OK:
-      printf("OK\n");
+      if (message->payload_size == 2) {
+        int code = atoi(message->payload);
+        print_ok(code);
+        if(code == 1) {
+          return -1;
+        }
+      }
       break;
     default:
       printf("UNKNOWN\n");
       break;
   }
+  return 0;
+}
+
+void disconnect(client_socket_info_t* sock_info){
+  char req[BUFF_SIZE], res[BUFF_SIZE];
+  message_t* req_args = init_message();
+
+  req_args->id = REQ_REM;
+  req_args->origin = id;
+  encode_args(req, req_args);
+  send(sock_info->server_fd, req, BUFF_SIZE, 0);
+
+  destroy_message(req_args);
+}
+
+int receive_initial_list(client_socket_info_t* sock_info) {
+  char res[BUFF_SIZE];
+
+  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+    message_t* res_args = init_message();
+    decode_args(res, res_args);
+    if (res_args->id != RES_LIST) {
+      destroy_message(res_args);
+      return -1;
+    }
+    if(handle_message(res_args) == -1){
+      return -1;
+    }
+    destroy_message(res_args);
+  }
+
+  return 0;
 }
 
 void* receiver(void* args) {
@@ -110,7 +166,9 @@ void* receiver(void* args) {
 
   while (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
     decode_args(res, res_args);
-    handle_message(res_args);
+    if(handle_message(res_args) == -1){
+      break;
+    }
   }
 
   destroy_message(res_args);
@@ -127,23 +185,8 @@ void* sender(void* args){
       send(sock_info->server_fd, req, BUFF_SIZE, 0);
     }
   }
-}
 
-int receive_initial_list(client_socket_info_t* sock_info) {
-  char res[BUFF_SIZE];
-
-  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
-    message_t* res_args = init_message();
-    decode_args(res, res_args);
-    if (res_args->id != RES_LIST) {
-      destroy_message(res_args);
-      return -1;
-    }
-    handle_message(res_args);
-    destroy_message(res_args);
-  }
-
-  return 0;
+  disconnect(sock_info);
 }
 
 int main(int argc, char const *argv[])
@@ -157,7 +200,7 @@ int main(int argc, char const *argv[])
   init_equipments();
 
   sock_info = create_equipment_socket(host, port);
-  int id = handshake(sock_info);
+  id = handshake(sock_info);
   if(id <= 0){
     return -1;
   }
