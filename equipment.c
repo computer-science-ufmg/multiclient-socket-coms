@@ -3,9 +3,13 @@
 
 #include "./common.h"
 
+// ======================= Globals ======================= //
+
 int id;
 int equipments[MAX_CLIENTS];
 int equiments_size = 0;
+
+// ======================= Utils ======================= //
 
 void init_equipments() {
   int i;
@@ -43,31 +47,6 @@ void print_ok(int code) {
     printf("Unknown message\n");
     break;
   }
-}
-
-int handshake(client_socket_info_t* sock_info){
-  char req[BUFF_SIZE];
-  char res[BUFF_SIZE];
-  int id = -1;
-  message_t* req_args = init_message();
-  message_t* res_args = init_message();
-
-  req_args->id = REQ_ADD;
-  encode_args(req, req_args);
-  send(sock_info->server_fd, req, BUFF_SIZE, 0);
-  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000){
-    decode_args(res, res_args);
-    if(res_args->id == RES_ADD && res_args->payload_size == 2){
-      id = atoi(res_args->payload);
-    }
-    else if (res_args->id == ERROR){
-      print_error(atoi(res_args->payload));
-    }
-  }
-
-  destroy_message(req_args);
-  destroy_message(res_args);
-  return id;
 }
 
 // ======================= Handlers ======================= //
@@ -118,11 +97,9 @@ int handle_res_list(message_t* message){
     return 1;
   }
 
-  // printf("Equipment list:\n");
   for(int i = 0; i < equiments_size; i++){
     id_str = slice(message->payload, i * 2, i * 2 + 2);
     equipments[i] = atoi(id_str);
-    // printf("%02d\n", equipments[i]);
     free(id_str);
   }
 
@@ -188,6 +165,31 @@ int handle_message(message_t* message){
 }
 
 // ======================= Lifecycle ======================= //
+
+int handshake(client_socket_info_t* sock_info) {
+  char req[BUFF_SIZE];
+  char res[BUFF_SIZE];
+  int id = -1;
+  message_t* req_args = init_message();
+  message_t* res_args = init_message();
+
+  req_args->id = REQ_ADD;
+  encode_args(req, req_args);
+  send(sock_info->server_fd, req, BUFF_SIZE, 0);
+  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+    decode_args(res, res_args);
+    if (res_args->id == RES_ADD && res_args->payload_size == 2) {
+      id = atoi(res_args->payload);
+    }
+    else if (res_args->id == ERROR) {
+      print_error(atoi(res_args->payload));
+    }
+  }
+
+  destroy_message(req_args);
+  destroy_message(res_args);
+  return id;
+}
 
 void disconnect(client_socket_info_t* sock_info){
   char req[BUFF_SIZE], res[BUFF_SIZE];

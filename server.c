@@ -3,15 +3,21 @@
 
 #include"./common.h"
 
+// ======================= Types ======================= //
+
 typedef struct worker_args {
   int index;
   socket_t client_fd;
 } worker_args_t;
 
+// ======================= Globals ======================= //
+
 pthread_t threads[MAX_CLIENTS];
 worker_args_t* connections[MAX_CLIENTS];
 int clients = 0;
 pthread_mutex_t mutex;
+
+// ======================= Utils ======================= //
 
 int get_available_thread_index() {
   int i;
@@ -40,6 +46,15 @@ void broadcast(char* message) {
     }
   }
 }
+
+void* create_worker_args(int index, socket_t client_fd) {
+  worker_args_t* args = (worker_args_t*)malloc(sizeof(worker_args_t));
+  args->index = index;
+  args->client_fd = client_fd;
+  return (void*)args;
+}
+
+// ======================= Actions ======================= //
 
 void disconnect_client(socket_t client_fd) {
   char* dc_message = (char*)calloc(BUFF_SIZE, sizeof(char));
@@ -76,13 +91,6 @@ void list_equipments(worker_args_t *args) {
   send(args->client_fd, res, BUFF_SIZE, 0);
 }
 
-void* create_worker_args(int index, socket_t client_fd) {
-  worker_args_t* args = (worker_args_t*)malloc(sizeof(worker_args_t));
-  args->index = index;
-  args->client_fd = client_fd;
-  return (void*)args;
-}
-
 void broadcast_remove(int client){
   char req[BUFF_SIZE];
   message_t* req_args = init_message();
@@ -107,6 +115,8 @@ void send_remove_error(socket_t client_fd) {
   destroy_message(res_args);
   send(client_fd, res, BUFF_SIZE, 0);
 }
+
+// ======================= Handlers ======================= //
 
 void handle_remove(message_t* message) {
   char res[BUFF_SIZE];
@@ -159,6 +169,8 @@ void handle_request(message_t* request) {
       break;
   }
 }
+
+// ======================= Threads ======================= //
 
 void* worker(void* arg) {
   char req[BUFF_SIZE];
@@ -227,6 +239,8 @@ void handshake(socket_t client_fd) {
 
   destroy_message(req_args);
 }
+
+// ======================= Main ======================= //
 
 int main(int argc, char const *argv[])
 {
