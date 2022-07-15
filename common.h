@@ -11,7 +11,11 @@
 #define FALSE !TRUE
 
 #define BUFF_SIZE 500
+#define MAX_CLIENTS 15
 
+// ====================== Error Payloads ====================== //
+
+#define MAX_CLIENTS_REACHED_PAYLOAD "04"
 
 // ========================= messages ========================= //
 
@@ -52,6 +56,8 @@ typedef struct client_socket_info {
   socket_t fd;
   socket_t server_fd;
 } client_socket_info_t;
+
+char* slice(char* str, int start, int end);
 
 message_t* init_message();
 void set_payload(message_t* message, void* payload, size_t payload_size);

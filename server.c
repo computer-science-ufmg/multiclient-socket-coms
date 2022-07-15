@@ -3,9 +3,6 @@
 
 #include"./common.h"
 
-#define MAX_CLIENTS 15
-#define MAX_CLIENTS_REACHED_PAYLOAD "04"
-
 typedef struct worker_args {
   int index;
   socket_t client_fd;

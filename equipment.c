@@ -1,6 +1,17 @@
-#include<pthread.h>
+#include <pthread.h>
+#include <string.h>
 
 #include "./common.h"
+
+int equipments[MAX_CLIENTS];
+int equiments_size = 0;
+
+void init_equipments() {
+  int i;
+  for (i = 0; i < MAX_CLIENTS; i++) {
+    equipments[i] = -1;
+  }
+}
 
 void print_error(int code){
   switch (code){
@@ -47,6 +58,27 @@ int handshake(client_socket_info_t* sock_info){
   return id;
 }
 
+void handle_res_list(message_t* message){
+  equiments_size = (int)(message->payload_size / 2);
+  char* id_str;
+
+  if (equiments_size > MAX_CLIENTS) {
+    return;
+  }
+
+  // printf("Equipment list:\n");
+  for(int i = 0; i < equiments_size; i++){
+    id_str = slice(message->payload, i * 2, i * 2 + 2);
+    equipments[i] = atoi(id_str);
+    // printf("%02d\n", equipments[i]);
+    free(id_str);
+  }
+
+  for(int i = equiments_size; i < MAX_CLIENTS; i++){
+    equipments[i] = -1;
+  }
+}
+
 void handle_message(message_t* message){
   switch (message->id)
   {
@@ -54,7 +86,7 @@ void handle_message(message_t* message){
       printf("Novo equipamento adicionado: %s\n", (char*)message->payload);
       break;
     case RES_LIST:
-      printf("RES_LIST\n");
+      handle_res_list(message);
       break;
     case RES_INF:
       printf("RES_INF\n");
@@ -72,12 +104,12 @@ void handle_message(message_t* message){
 }
 
 void* receiver(void* args) {
-  char req[BUFF_SIZE];
+  char res[BUFF_SIZE];
   message_t* res_args = init_message();
   client_socket_info_t* sock_info = (client_socket_info_t*)args;
 
-  while (read(sock_info->server_fd, req, BUFF_SIZE) != 0b00000000) {
-    decode_args(req, res_args);
+  while (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+    decode_args(res, res_args);
     handle_message(res_args);
   }
 
@@ -97,21 +129,43 @@ void* sender(void* args){
   }
 }
 
+int receive_initial_list(client_socket_info_t* sock_info) {
+  char res[BUFF_SIZE];
+
+  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+    message_t* res_args = init_message();
+    decode_args(res, res_args);
+    if (res_args->id != RES_LIST) {
+      destroy_message(res_args);
+      return -1;
+    }
+    handle_message(res_args);
+    destroy_message(res_args);
+  }
+
+  return 0;
+}
+
 int main(int argc, char const *argv[])
 {
   char const* host = argv[1];
-  char req[BUFF_SIZE], res[BUFF_SIZE];
   int port = atoi(argv[2]);
+  char req[BUFF_SIZE], res[BUFF_SIZE];
   client_socket_info_t* sock_info;
   pthread_t receiver_thread, sender_thread;
+
+  init_equipments();
 
   sock_info = create_equipment_socket(host, port);
   int id = handshake(sock_info);
   if(id <= 0){
     return -1;
   }
-
   printf("New ID: %d\n", id);
+
+  if(receive_initial_list(sock_info) < 0){
+    return -1;
+  }
 
   pthread_create(&receiver_thread, NULL, receiver, (void*)sock_info);
   pthread_create(&sender_thread, NULL, sender, (void*)sock_info);
