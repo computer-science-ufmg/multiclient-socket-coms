@@ -70,12 +70,52 @@ int handshake(client_socket_info_t* sock_info){
   return id;
 }
 
-void handle_res_list(message_t* message){
+// ======================= Handlers ======================= //
+
+int handle_req_rem(message_t* request) {
+  int origin = request->origin;
+  if(origin < 0){
+    return 1;
+  }
+
+  for (int i = 0; i < MAX_CLIENTS; i++){
+    if (equipments[i] == origin){
+      equipments[i] = -1;
+      equiments_size--;
+      printf("Equipment %02d removed\n", origin);
+      return 0;
+    }
+  }
+
+  return 1;
+  
+}
+
+int handle_res_add(message_t* message) {
+  int id = atoi(message->payload);
+
+  if(equiments_size >= MAX_CLIENTS){
+    return 1;
+  }
+
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (equipments[i] == -1) {
+      equipments[i] = id;
+      equiments_size++;
+      printf("Equipment %02d added\n", id);
+      return 0;
+    }
+  }
+  
+  return 0;
+}
+
+int handle_res_list(message_t* message){
   equiments_size = (int)(message->payload_size / 2);
   char* id_str;
 
   if (equiments_size > MAX_CLIENTS) {
-    return;
+    return 1;
   }
 
   // printf("Equipment list:\n");
@@ -89,44 +129,65 @@ void handle_res_list(message_t* message){
   for(int i = equiments_size; i < MAX_CLIENTS; i++){
     equipments[i] = -1;
   }
+
+  return 0;
+}
+
+int handle_res_inf(message_t* message){
+  printf("RES_INF\n");
+  return 0;
+}
+
+int handle_error(message_t* message){
+  if (message->payload_size == 2) {
+    int code = atoi(message->payload);
+    print_error(code);
+    if (code == 1) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+int handle_ok(message_t* message){
+  if (message->payload_size == 2) {
+    int code = atoi(message->payload);
+    print_ok(code);
+    if (code == 1) {
+      return -1;
+    }
+  }
+  return 0;
 }
 
 int handle_message(message_t* message){
   switch (message->id)
   {
+    case REQ_REM:
+      return handle_req_rem(message);
+
     case RES_ADD:
-      printf("Novo equipamento adicionado: %s\n", (char*)message->payload);
-      break;
+      return handle_res_add(message);
+
     case RES_LIST:
-      handle_res_list(message);
-      break;
+      return handle_res_list(message);
+
     case RES_INF:
-      printf("RES_INF\n");
-      break;
+      return handle_res_inf(message);
+      
     case ERROR:
-      if (message->payload_size == 2) {
-        int code = atoi(message->payload);
-        print_error(code);
-        if (code == 1) {
-          return -1;
-        }
-      }
-      break;
+      return handle_error(message);      
+
     case OK:
-      if (message->payload_size == 2) {
-        int code = atoi(message->payload);
-        print_ok(code);
-        if(code == 1) {
-          return -1;
-        }
-      }
-      break;
+      return handle_ok(message);
+      
     default:
       printf("UNKNOWN\n");
-      break;
+      return 0;
   }
-  return 0;
 }
+
+// ======================= Lifecycle ======================= //
 
 void disconnect(client_socket_info_t* sock_info){
   char req[BUFF_SIZE], res[BUFF_SIZE];
@@ -159,6 +220,8 @@ int receive_initial_list(client_socket_info_t* sock_info) {
   return 0;
 }
 
+// ======================= Threads ======================= //
+
 void* receiver(void* args) {
   char res[BUFF_SIZE];
   message_t* res_args = init_message();
@@ -166,8 +229,12 @@ void* receiver(void* args) {
 
   while (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
     decode_args(res, res_args);
-    if(handle_message(res_args) == -1){
+    int code = handle_message(res_args);
+    if(code == -1){
       break;
+    }
+    else if(code == 1){
+      printf("Error handling response\n");
     }
   }
 
@@ -188,6 +255,8 @@ void* sender(void* args){
 
   disconnect(sock_info);
 }
+
+// ======================= Main ======================= //
 
 int main(int argc, char const *argv[])
 {
@@ -214,6 +283,7 @@ int main(int argc, char const *argv[])
   pthread_create(&sender_thread, NULL, sender, (void*)sock_info);
 
   pthread_join(sender_thread, NULL);
+  pthread_join(receiver_thread, NULL);
   
   return 0;
 }
