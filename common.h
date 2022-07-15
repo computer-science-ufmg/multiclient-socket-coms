@@ -13,10 +13,14 @@
 #define BUFF_SIZE 500
 #define MAX_CLIENTS 15
 
+#define END_OF_COM 0b00000000
+
 // ========================= Payloads ========================= //
 
 #define SUCCESSFULL_REMOVAL_PAYLOAD "01"
 #define REMOVE_ERROR_PAYLOAD "01"
+#define ORIGIN_EQUIPMENT_NOT_FOUND_PAYLOAD "02"
+#define DESTINATION_EQUIPMENT_NOT_FOUND_PAYLOAD "03"
 #define MAX_CLIENTS_REACHED_PAYLOAD "04"
 
 // ========================= messages ========================= //
@@ -38,6 +42,7 @@ typedef int equipment_t;
 typedef struct sockaddr_in sockaddr_in_t;
 typedef struct sockaddr sockaddr_t;
 typedef int socket_t;
+typedef int bool;
 
 typedef struct message_t {
   int id;
@@ -58,6 +63,8 @@ typedef struct client_socket_info {
   socket_t fd;
   socket_t server_fd;
 } client_socket_info_t;
+
+// ========================= functions ========================= //
 
 char* slice(char* str, int start, int end);
 

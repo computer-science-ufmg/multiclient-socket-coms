@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <string.h>
+#include <time.h>
 
 #include "./common.h"
 
@@ -56,6 +57,13 @@ void print_ok(int code) {
     printf("Unknown message\n");
     break;
   }
+}
+
+float get_value() {
+  int max = 10;
+  int d = rand();
+  float r = (float)d / (float)RAND_MAX;
+  return max * r;
 }
 
 // ======================= Handlers ======================= //
@@ -119,8 +127,29 @@ int handle_res_list(message_t* message){
   return 0;
 }
 
+int handle_req_inf(message_t* request, client_socket_info_t* sock_info) {
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+  float value = get_value();
+  char payload[6];
+
+  printf("requested information\n");
+  sprintf(payload, "%.2f", value);
+
+  res_args->id = RES_INF;
+  res_args->origin = request->destination;
+  res_args->destination = request->origin;
+  set_payload(res_args, payload, strlen(payload));
+
+  encode_args(res, res_args);
+  destroy_message(res_args);
+  send(sock_info->server_fd, res, BUFF_SIZE, 0);
+
+  return 0;
+}
+
 int handle_res_inf(message_t* message){
-  printf("RES_INF\n");
+  printf("Value from %02d: %.2f\n", message->origin, atof(message->payload));
   return 0;
 }
 
@@ -146,7 +175,7 @@ int handle_ok(message_t* message){
   return 0;
 }
 
-int handle_message(message_t* message){
+int handle_message(message_t* message, client_socket_info_t* sock_info) {
   switch (message->id)
   {
     case REQ_REM:
@@ -157,6 +186,9 @@ int handle_message(message_t* message){
 
     case RES_LIST:
       return handle_res_list(message);
+
+    case REQ_INF:
+      return handle_req_inf(message, sock_info);
 
     case RES_INF:
       return handle_res_inf(message);
@@ -174,6 +206,15 @@ int handle_message(message_t* message){
 }
 
 // ======================= Requests ======================= //
+
+void run_list_equipments(){
+  for(int i = 0; i < MAX_CLIENTS; i++){
+    if(equipments[i] != -1){
+      printf("%02d ", equipments[i]);
+    }
+  }
+  printf("\n");
+}
 
 int run_request_info(client_socket_info_t* sock_info, int dest_id) {
   char req[BUFF_SIZE];
@@ -194,9 +235,10 @@ int run_command(char* command, client_socket_info_t* sock_info) {
     return -1;
   }
   else if (strncmp(command, LIST_EQUIPMENT_COMMAND, LIST_EQUIPMENT_COMMAND_LENGTH) == 0){
+    run_list_equipments();
     return 0;
   }
-  else if (strncmp(command, REQUEST_INFO_COMMAND, REQUEST_INFO_COMMAND_LENGTH) == 0){
+  else if (strncmp(command, REQUEST_INFO_COMMAND, REQUEST_INFO_COMMAND_LENGTH - 1) == 0){
     int dest_id = atoi(command + REQUEST_INFO_COMMAND_LENGTH);
     return run_request_info(sock_info, dest_id);
   }
@@ -218,7 +260,7 @@ int handshake(client_socket_info_t* sock_info) {
   req_args->id = REQ_ADD;
   encode_args(req, req_args);
   send(sock_info->server_fd, req, BUFF_SIZE, 0);
-  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+  if (read(sock_info->server_fd, res, BUFF_SIZE) != END_OF_COM) {
     decode_args(res, res_args);
     if (res_args->id == RES_ADD && res_args->payload_size == 2) {
       id = atoi(res_args->payload);
@@ -248,14 +290,14 @@ void disconnect(client_socket_info_t* sock_info){
 int receive_initial_list(client_socket_info_t* sock_info) {
   char res[BUFF_SIZE];
 
-  if (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+  if (read(sock_info->server_fd, res, BUFF_SIZE) != END_OF_COM) {
     message_t* res_args = init_message();
     decode_args(res, res_args);
     if (res_args->id != RES_LIST) {
       destroy_message(res_args);
       return -1;
     }
-    if(handle_message(res_args) == -1){
+    if(handle_message(res_args, sock_info) == -1){
       return -1;
     }
     destroy_message(res_args);
@@ -271,9 +313,9 @@ void* receiver(void* args) {
   message_t* res_args = init_message();
   client_socket_info_t* sock_info = (client_socket_info_t*)args;
 
-  while (read(sock_info->server_fd, res, BUFF_SIZE) != 0b00000000) {
+  while (read(sock_info->server_fd, res, BUFF_SIZE) != END_OF_COM) {
     decode_args(res, res_args);
-    int code = handle_message(res_args);
+    int code = handle_message(res_args, sock_info);
     if(code == -1){
       break;
     }
@@ -311,6 +353,7 @@ int main(int argc, char const *argv[])
   client_socket_info_t* sock_info;
   pthread_t receiver_thread, sender_thread;
 
+  srand(time(NULL));
   init_equipments();
 
   sock_info = create_equipment_socket(host, port);
@@ -318,7 +361,7 @@ int main(int argc, char const *argv[])
   if(id <= 0){
     return -1;
   }
-  printf("New ID: %d\n", id);
+  printf("New ID: %02d\n", id);
 
   if(receive_initial_list(sock_info) < 0){
     return -1;

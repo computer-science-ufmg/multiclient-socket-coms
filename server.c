@@ -54,6 +54,15 @@ void* create_worker_args(int index, socket_t client_fd) {
   return (void*)args;
 }
 
+bool is_valid_equipment(equipment_t equipment) {
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (connections[i] != NULL && connections[i]->client_fd == equipment) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 // ======================= Actions ======================= //
 
 void disconnect_client(socket_t client_fd) {
@@ -62,16 +71,33 @@ void disconnect_client(socket_t client_fd) {
   close(client_fd);
 }
 
-void send_max_clients_reached(socket_t client_fd){
+void send_error(socket_t client_fd, char* error_code) {
   char res[BUFF_SIZE];
   message_t* res_args = init_message();
 
   res_args->id = ERROR;
-  res_args->destination = 0;
-  set_payload(res_args, MAX_CLIENTS_REACHED_PAYLOAD, sizeof(MAX_CLIENTS_REACHED_PAYLOAD));
+  res_args->destination = client_fd;
+  set_payload(res_args, error_code, sizeof(error_code));
 
   encode_args(res, res_args);
   send(client_fd, res, BUFF_SIZE, 0);
+  destroy_message(res_args);
+}
+
+void send_max_clients_reached(socket_t client_fd){
+  send_error(client_fd, MAX_CLIENTS_REACHED_PAYLOAD);
+}
+
+void send_remove_error(socket_t client_fd) {
+  send_error(client_fd, REMOVE_ERROR_PAYLOAD);
+}
+
+void send_origin_equipment_not_found(socket_t client_fd) {
+  send_error(client_fd, ORIGIN_EQUIPMENT_NOT_FOUND_PAYLOAD);
+}
+
+void send_destination_equipment_not_found(socket_t client_fd) {
+  send_error(client_fd, DESTINATION_EQUIPMENT_NOT_FOUND_PAYLOAD);
 }
 
 void list_equipments(worker_args_t *args) {
@@ -103,17 +129,22 @@ void broadcast_remove(int client){
   broadcast(req);
 }
 
-void send_remove_error(socket_t client_fd) {
-  char res[BUFF_SIZE];
-  message_t* res_args = init_message();
+int request_quipment_info(message_t* message, message_t* res_args) {
+  char req[BUFF_SIZE], res[BUFF_SIZE];
 
-  res_args->id = ERROR;
-  res_args->destination = client_fd;
-  set_payload(res_args, REMOVE_ERROR_PAYLOAD, sizeof(REMOVE_ERROR_PAYLOAD));
+  encode_args(req, message);
+  send(message->destination, req, BUFF_SIZE, 0);
 
-  encode_args(res, res_args);
-  destroy_message(res_args);
-  send(client_fd, res, BUFF_SIZE, 0);
+  if(recv(message->destination, res, BUFF_SIZE, 0) == END_OF_COM){
+    return -1;
+  }
+
+  decode_args(res, res_args);
+  if(res_args->id != RES_INF) {
+    return 1;
+  }
+
+  return 0;
 }
 
 // ======================= Handlers ======================= //
@@ -154,10 +185,57 @@ void handle_remove(message_t* message) {
   free(client);
 }
 
-void handle_request(message_t* request) {
+void handle_req_inf(message_t* message, socket_t client_fd) {
+  char res[BUFF_SIZE];
+  message_t* res_args = init_message();
+  int origin = message->origin, destination = message->destination;
+
+  pthread_mutex_lock(&mutex);
+  if(!is_valid_equipment(origin)) {
+    printf("Equipment %02d not found\n", origin);
+    send_origin_equipment_not_found(client_fd);
+    pthread_mutex_unlock(&mutex);
+    return;
+  }
+
+  if(!is_valid_equipment(destination)) {
+    printf("Equipment %02d not found\n", destination);
+    send_destination_equipment_not_found(client_fd);
+    pthread_mutex_unlock(&mutex);
+    return;
+  }
+  pthread_mutex_unlock(&mutex);
+
+  if (request_quipment_info(message, res_args) != 0) {
+    // send_error(client_fd, REQUEST_ERROR_PAYLOAD);
+    return;
+  }
+
+  pthread_mutex_lock(&mutex);
+  if (!is_valid_equipment(res_args->origin)) {
+    printf("Equipment %02d not found\n", res_args->origin);
+    send_origin_equipment_not_found(res_args->origin);
+    pthread_mutex_unlock(&mutex);
+    return;
+  }
+
+  if (!is_valid_equipment(res_args->destination)) {
+    printf("Equipment %02d not found\n", res_args->destination);
+    send_destination_equipment_not_found(res_args->destination);
+    pthread_mutex_unlock(&mutex);
+    return;
+  }
+  pthread_mutex_unlock(&mutex);
+
+  encode_args(res, res_args);
+  send(client_fd, res, BUFF_SIZE, 0);
+  destroy_message(res_args);
+}
+
+void handle_request(message_t* request, socket_t client_fd) {
   switch (request->id) {
     case REQ_INF:
-      /* code */
+      handle_req_inf(request, client_fd);
       break;
 
     case REQ_REM:
@@ -183,9 +261,9 @@ void* worker(void* arg) {
   printf("Equipment %02d added\n", client_fd);
 
   list_equipments(client);
-  while (connections[index] != NULL && read(client_fd, req, BUFF_SIZE) != 0b00000000) {
+  while (connections[index] != NULL && read(client_fd, req, BUFF_SIZE) != END_OF_COM) {
     decode_args(req, req_args);
-    handle_request(req_args);
+    handle_request(req_args, client_fd);
   }
 
   destroy_message(req_args);
@@ -217,7 +295,7 @@ void handshake(socket_t client_fd) {
   int index;
   message_t* req_args = init_message();
 
-  if (read(client_fd, req, BUFF_SIZE) != 0b00000000) {
+  if (read(client_fd, req, BUFF_SIZE) != END_OF_COM) {
     decode_args(req, req_args);
     if (req_args->id != REQ_ADD) {
       disconnect_client(client_fd);
