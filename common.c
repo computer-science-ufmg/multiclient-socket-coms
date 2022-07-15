@@ -42,10 +42,14 @@ int read_input(char* buff, int size) {
     if (c == '\n' || c == '\0') {
       break;
     }
+    if (c == '\b'){
+      pos--;
+      continue;
+    }
     buff[pos] = c;
     pos++;
   }
-  buff[pos] = '\n';
+  buff[pos] = '\0';
   pos++;
   return pos;
 }

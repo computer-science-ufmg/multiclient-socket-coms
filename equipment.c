@@ -3,6 +3,15 @@
 
 #include "./common.h"
 
+#define CLOSE_CONNECTION_COMMAND "close connection"
+#define CLOSE_CONNECTION_COMMAND_LENGTH (sizeof(CLOSE_CONNECTION_COMMAND) - 1)
+
+#define LIST_EQUIPMENT_COMMAND "list equipment"
+#define LIST_EQUIPMENT_COMMAND_LENGTH (sizeof(LIST_EQUIPMENT_COMMAND) - 1)
+
+#define REQUEST_INFO_COMMAND "request information from "
+#define REQUEST_INFO_COMMAND_LENGTH (sizeof(REQUEST_INFO_COMMAND) - 1)
+
 // ======================= Globals ======================= //
 
 int id;
@@ -164,6 +173,39 @@ int handle_message(message_t* message){
   }
 }
 
+// ======================= Requests ======================= //
+
+int run_request_info(client_socket_info_t* sock_info, int dest_id) {
+  char req[BUFF_SIZE];
+  message_t* message = init_message();
+  
+  message->id = REQ_INF;
+  message->origin = id;
+  message->destination = dest_id;
+  encode_args(req, message);
+
+  send(sock_info->server_fd, req, BUFF_SIZE, 0);
+
+  return 0;
+}
+
+int run_command(char* command, client_socket_info_t* sock_info) {
+  if (strncmp(command, CLOSE_CONNECTION_COMMAND, CLOSE_CONNECTION_COMMAND_LENGTH) == 0){
+    return -1;
+  }
+  else if (strncmp(command, LIST_EQUIPMENT_COMMAND, LIST_EQUIPMENT_COMMAND_LENGTH) == 0){
+    return 0;
+  }
+  else if (strncmp(command, REQUEST_INFO_COMMAND, REQUEST_INFO_COMMAND_LENGTH) == 0){
+    int dest_id = atoi(command + REQUEST_INFO_COMMAND_LENGTH);
+    return run_request_info(sock_info, dest_id);
+  }
+  else {
+    printf("Unknown command\n");
+    return 1;
+  }
+}
+
 // ======================= Lifecycle ======================= //
 
 int handshake(client_socket_info_t* sock_info) {
@@ -244,14 +286,15 @@ void* receiver(void* args) {
 }
 
 void* sender(void* args){
-  char req[BUFF_SIZE];
+  char command[BUFF_SIZE + 1];
+  int code = 0;
   client_socket_info_t* sock_info = (client_socket_info_t*)args;
 
-  while (!feof(stdin)) {
-    int size = read_input(req, BUFF_SIZE);
+  while (!feof(stdin) && code != -1) {
+    int size = read_input(command, BUFF_SIZE);
 
     if (size > 1) {
-      send(sock_info->server_fd, req, BUFF_SIZE, 0);
+      code = run_command(command, sock_info);
     }
   }
 
