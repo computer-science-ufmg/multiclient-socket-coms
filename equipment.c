@@ -345,8 +345,7 @@ void* sender(void* args){
 
 // ======================= Main ======================= //
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]) {
   char const* host = argv[1];
   int port = atoi(argv[2]);
   char req[BUFF_SIZE], res[BUFF_SIZE];

@@ -322,8 +322,7 @@ void handshake(socket_t client_fd) {
 
 // ======================= Main ======================= //
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]) {
   int port = atoi(argv[1]);
   pthread_mutex_init(&mutex, NULL);
 
