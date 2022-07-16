@@ -183,6 +183,8 @@ void handle_remove(message_t* message) {
   destroy_message(res_args);
   close(origin);
   free(client);
+
+  printf("Equipment %02d removed\n", origin);
 }
 
 void handle_req_inf(message_t* message, socket_t client_fd) {
@@ -326,7 +328,7 @@ int main(int argc, char const *argv[])
   pthread_mutex_init(&mutex, NULL);
 
   server_socket_info_t* sock_info = create_server_socket(port);
-  printf("Server listening on port %d\n", port);
+  // printf("Server listening on port %d\n", port);
   
   while(TRUE){
     socket_t client_fd = connect_client(sock_info);
